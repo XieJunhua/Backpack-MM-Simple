@@ -75,13 +75,21 @@ last_stats: Dict[str, Any] = {}
 @app.route('/')
 def index():
     """首頁 - 控制面板"""
+    # 檢查是否禁用控制面板
+    disable_control = os.getenv('DISABLE_CONTROL_PANEL', 'false').lower() in ('true', '1', 'yes')
+    if disable_control:
+        # 重定向到儀表盤
+        from flask import redirect
+        return redirect('/dashboard')
     return render_template('index.html')
 
 
 @app.route('/dashboard')
 def dashboard():
     """量化數據儀表盤 - 只讀"""
-    return render_template('dashboard.html')
+    # 檢查是否禁用控制面板
+    disable_control = os.getenv('DISABLE_CONTROL_PANEL', 'false').lower() in ('true', '1', 'yes')
+    return render_template('dashboard.html', disable_control=disable_control)
 
 
 @app.route('/api/login', methods=['POST'])

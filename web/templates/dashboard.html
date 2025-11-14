@@ -140,13 +140,15 @@
     <!-- 導航欄 -->
     <nav class="navbar navbar-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-                <i class="bi bi-graph-up"></i> 量化交易系統
+            <a class="navbar-brand" href="/dashboard">
+                <i class="bi bi-graph-up"></i> 量化交易數據儀表盤
             </a>
             <div>
+                {% if not disable_control %}
                 <a href="/" class="btn btn-outline-light btn-sm me-2">
                     <i class="bi bi-gear"></i> 控制面板
                 </a>
+                {% endif %}
                 <button class="refresh-btn" onclick="refreshAllData()">
                     <i class="bi bi-arrow-clockwise"></i> 刷新數據
                 </button>
@@ -162,6 +164,64 @@
                     <i class="bi bi-speedometer2"></i> 實時狀態
                     <span id="bot-status-badge" class="status-badge status-stopped ms-2">停止</span>
                 </h4>
+            </div>
+        </div>
+
+        <!-- 整體績效指標 - 移到頂部 -->
+        <div class="row mt-3 mb-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-award"></i> 整體績效指標（歷史累計）
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>總交易筆數</strong></p>
+                                <p class="text-muted mb-0" id="perf-total-trades">--</p>
+                            </div>
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>Maker交易</strong></p>
+                                <p class="text-muted mb-0" id="perf-maker-trades">--</p>
+                            </div>
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>總成交額</strong></p>
+                                <p class="text-muted mb-0" id="perf-total-volume">--</p>
+                            </div>
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>總手續費</strong></p>
+                                <p class="text-muted mb-0" id="perf-total-fees">--</p>
+                            </div>
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>淨利潤</strong></p>
+                                <p class="mb-0" id="perf-net-profit">--</p>
+                            </div>
+                            <div class="col-md-2">
+                                <p class="mb-1"><strong>Maker成交量</strong></p>
+                                <p class="text-muted mb-0" id="perf-maker-volume">--</p>
+                            </div>
+                        </div>
+                        <hr class="my-2">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>平均成交價</strong></p>
+                                <p class="text-muted mb-0" id="perf-avg-price">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>平均成交量</strong></p>
+                                <p class="text-muted mb-0" id="perf-avg-size">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>買入交易</strong></p>
+                                <p class="text-muted mb-0" id="perf-buy-trades">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>賣出交易</strong></p>
+                                <p class="text-muted mb-0" id="perf-sell-trades">--</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -300,55 +360,6 @@
             </div>
         </div>
 
-        <!-- 績效指標 -->
-        <div class="row mt-4 mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <i class="bi bi-award"></i> 整體績效指標
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>總交易筆數</strong></p>
-                                <p class="text-muted mb-0" id="perf-total-trades">--</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>Maker交易</strong></p>
-                                <p class="text-muted mb-0" id="perf-maker-trades">--</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>平均成交價</strong></p>
-                                <p class="text-muted mb-0" id="perf-avg-price">--</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>平均成交量</strong></p>
-                                <p class="text-muted mb-0" id="perf-avg-size">--</p>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="row">
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>總成交額</strong></p>
-                                <p class="text-muted mb-0" id="perf-total-volume">--</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>總手續費</strong></p>
-                                <p class="text-muted mb-0" id="perf-total-fees">--</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>淨利潤</strong></p>
-                                <p class="mb-0" id="perf-net-profit">--</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1"><strong>Maker成交量</strong></p>
-                                <p class="text-muted mb-0" id="perf-maker-volume">--</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -571,6 +582,12 @@
                         formatWithColor(netProfit, 4) + ' USDC';
 
                     document.getElementById('perf-maker-volume').textContent = formatNumber(perf.maker_volume, 2) + ' USDC';
+
+                    // 添加買入和賣出交易統計
+                    document.getElementById('perf-buy-trades').textContent =
+                        `${perf.buy_trades || 0} (${perf.total_trades > 0 ? ((perf.buy_trades / perf.total_trades) * 100).toFixed(1) : 0}%)`;
+                    document.getElementById('perf-sell-trades').textContent =
+                        `${perf.sell_trades || 0} (${perf.total_trades > 0 ? ((perf.sell_trades / perf.total_trades) * 100).toFixed(1) : 0}%)`;
                 }
             } catch (error) {
                 console.error('載入績效指標失敗:', error);
