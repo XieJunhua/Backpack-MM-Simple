@@ -2,10 +2,21 @@
 滑点保护模块
 提供价格偏离检测和滑点保护功能
 """
+import os
+import sys
 from typing import Optional, Tuple
-from logger import setup_logger
 
-logger = setup_logger("utils.slippage_protection")
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from logger import setup_logger
+    logger = setup_logger("utils.slippage_protection")
+except ImportError:
+    # 如果无法导入logger，使用标准logging
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("utils.slippage_protection")
 
 
 class SlippageProtection:

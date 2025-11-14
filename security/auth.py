@@ -3,6 +3,7 @@ Web认证模块
 提供基于Token的身份验证机制
 """
 import os
+import sys
 import secrets
 import hashlib
 import time
@@ -10,9 +11,18 @@ from typing import Optional, Dict
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify
-from logger import setup_logger
 
-logger = setup_logger("security.auth")
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from logger import setup_logger
+    logger = setup_logger("security.auth")
+except ImportError:
+    # 如果无法导入logger，使用标准logging
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("security.auth")
 
 
 class TokenAuth:
