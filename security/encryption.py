@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from logger import setup_logger
 
 logger = setup_logger("security.encryption")
@@ -50,7 +50,7 @@ class KeyEncryption:
             # 使用固定盐值或从配置读取
             salt = b'backpack-mm-salt'  # 生产环境应使用随机生成并安全存储的盐值
 
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
