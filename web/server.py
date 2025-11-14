@@ -74,8 +74,14 @@ last_stats: Dict[str, Any] = {}
 
 @app.route('/')
 def index():
-    """首頁"""
+    """首頁 - 控制面板"""
     return render_template('index.html')
+
+
+@app.route('/dashboard')
+def dashboard():
+    """量化數據儀表盤 - 只讀"""
+    return render_template('dashboard.html')
 
 
 @app.route('/api/login', methods=['POST'])
@@ -518,6 +524,150 @@ def get_config():
             'lighter': bool(os.getenv('LIGHTER_PRIVATE_KEY') and os.getenv('LIGHTER_PUBLIC_KEY'))
         }
     })
+
+
+# ============================================================
+# 儀表盤數據API (只讀)
+# ============================================================
+
+@app.route('/api/dashboard/current', methods=['GET'])
+def get_dashboard_current():
+    """獲取當前運行狀態和實時統計"""
+    return jsonify({
+        'bot_status': bot_status,
+        'stats': last_stats if last_stats else bot_status.get('stats', {})
+    })
+
+
+@app.route('/api/dashboard/history', methods=['GET'])
+def get_dashboard_history():
+    """獲取歷史交易統計"""
+    try:
+        from database.db import Database
+
+        # 獲取查詢參數
+        symbol = request.args.get('symbol', 'SOL_USDC')
+        days = int(request.args.get('days', 7))
+
+        db = Database()
+
+        # 獲取最近N天的統計數據
+        stats = db.get_trading_stats(symbol)
+
+        # 限制返回的天數
+        if stats:
+            stats = stats[:days]
+
+        # 獲取總計統計
+        all_time_stats = db.get_all_time_stats(symbol)
+
+        db.close()
+
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'daily_stats': stats,
+            'all_time_stats': all_time_stats
+        })
+    except ImportError:
+        return jsonify({
+            'success': False,
+            'error': '數據庫模塊未啟用'
+        }), 400
+    except Exception as e:
+        logger.error(f"獲取歷史統計失敗: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/dashboard/trades', methods=['GET'])
+def get_dashboard_trades():
+    """獲取最近的交易記錄"""
+    try:
+        from database.db import Database
+
+        symbol = request.args.get('symbol', 'SOL_USDC')
+        limit = int(request.args.get('limit', 100))
+
+        db = Database()
+        trades = db.get_recent_trades(symbol, limit)
+        db.close()
+
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'trades': trades
+        })
+    except ImportError:
+        return jsonify({
+            'success': False,
+            'error': '數據庫模塊未啟用'
+        }), 400
+    except Exception as e:
+        logger.error(f"獲取交易記錄失敗: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/dashboard/performance', methods=['GET'])
+def get_dashboard_performance():
+    """獲取策略績效指標"""
+    try:
+        from database.db import Database
+
+        symbol = request.args.get('symbol', 'SOL_USDC')
+
+        db = Database()
+
+        # 獲取所有交易記錄用於計算績效
+        orders = db.get_order_history(symbol, limit=10000)
+
+        # 計算績效指標
+        performance = {
+            'total_trades': len(orders),
+            'buy_trades': sum(1 for o in orders if o[0] == 'Bid'),
+            'sell_trades': sum(1 for o in orders if o[0] == 'Ask'),
+            'maker_trades': sum(1 for o in orders if o[3] == 1),
+            'taker_trades': sum(1 for o in orders if o[3] == 0),
+            'total_volume': sum(float(o[1]) * float(o[2]) for o in orders),
+            'total_fees': sum(float(o[4]) for o in orders),
+            'avg_trade_size': sum(float(o[1]) for o in orders) / len(orders) if orders else 0,
+            'avg_price': sum(float(o[2]) for o in orders) / len(orders) if orders else 0
+        }
+
+        # 獲取統計數據
+        all_time_stats = db.get_all_time_stats(symbol)
+
+        if all_time_stats:
+            performance.update({
+                'total_profit': all_time_stats.get('total_profit', 0),
+                'total_net_profit': all_time_stats.get('total_net_profit', 0),
+                'maker_volume': all_time_stats.get('total_maker_buy', 0) + all_time_stats.get('total_maker_sell', 0),
+                'taker_volume': all_time_stats.get('total_taker_buy', 0) + all_time_stats.get('total_taker_sell', 0)
+            })
+
+        db.close()
+
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'performance': performance
+        })
+    except ImportError:
+        return jsonify({
+            'success': False,
+            'error': '數據庫模塊未啟用'
+        }), 400
+    except Exception as e:
+        logger.error(f"獲取績效指標失敗: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @socketio.on('connect')

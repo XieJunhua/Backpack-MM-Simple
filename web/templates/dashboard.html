@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量化交易數據儀表盤</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+        .navbar {
+            background-color: #161b22 !important;
+            border-bottom: 1px solid #21262d;
+        }
+        .card {
+            background-color: #161b22;
+            border: 1px solid #21262d;
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #1c2128;
+            border-bottom: 1px solid #21262d;
+            font-weight: 600;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #1c2128 0%, #161b22 100%);
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: #30363d;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #8b949e;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .positive {
+            color: #3fb950;
+        }
+        .negative {
+            color: #f85149;
+        }
+        .neutral {
+            color: #58a6ff;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-running {
+            background-color: #238636;
+            color: white;
+        }
+        .status-stopped {
+            background-color: #6e7681;
+            color: white;
+        }
+        .table {
+            color: #c9d1d9;
+        }
+        .table thead {
+            background-color: #1c2128;
+            border-bottom: 2px solid #21262d;
+        }
+        .table tbody tr {
+            border-bottom: 1px solid #21262d;
+        }
+        .table tbody tr:hover {
+            background-color: #1c2128;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        .refresh-btn {
+            background-color: #238636;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .refresh-btn:hover {
+            background-color: #2ea043;
+        }
+        .metric-icon {
+            font-size: 2rem;
+            opacity: 0.3;
+            float: right;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #8b949e;
+        }
+        .small-text {
+            font-size: 0.75rem;
+            color: #8b949e;
+        }
+        .badge-buy {
+            background-color: #238636;
+            color: white;
+        }
+        .badge-sell {
+            background-color: #da3633;
+            color: white;
+        }
+        .badge-maker {
+            background-color: #1f6feb;
+            color: white;
+        }
+        .badge-taker {
+            background-color: #8957e5;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-graph-up"></i> 量化交易系統
+            </a>
+            <div>
+                <a href="/" class="btn btn-outline-light btn-sm me-2">
+                    <i class="bi bi-gear"></i> 控制面板
+                </a>
+                <button class="refresh-btn" onclick="refreshAllData()">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新數據
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- 當前狀態概覽 -->
+        <div class="row">
+            <div class="col-12">
+                <h4>
+                    <i class="bi bi-speedometer2"></i> 實時狀態
+                    <span id="bot-status-badge" class="status-badge status-stopped ms-2">停止</span>
+                </h4>
+            </div>
+        </div>
+
+        <!-- 統計卡片 -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="bi bi-cash-coin metric-icon"></i>
+                    <div class="stat-label">總餘額 (USDC)</div>
+                    <div class="stat-value neutral" id="total-balance">--</div>
+                    <div class="small-text">實時更新</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="bi bi-graph-up-arrow metric-icon"></i>
+                    <div class="stat-label">累計盈虧 (USDC)</div>
+                    <div class="stat-value" id="cumulative-pnl">--</div>
+                    <div class="small-text">手續費後淨值</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="bi bi-arrow-left-right metric-icon"></i>
+                    <div class="stat-label">成交額 (USDC)</div>
+                    <div class="stat-value neutral" id="total-volume">--</div>
+                    <div class="small-text">本次運行</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="bi bi-list-ol metric-icon"></i>
+                    <div class="stat-label">成交筆數</div>
+                    <div class="stat-value neutral" id="total-trades">--</div>
+                    <div class="small-text">買 <span id="buy-trades">0</span> / 賣 <span id="sell-trades">0</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 更多統計 -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="bi bi-percent metric-icon"></i>
+                    <div class="stat-label">磨損率</div>
+                    <div class="stat-value" id="slippage-rate">--</div>
+                    <div class="small-text">盈虧 / 成交額</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="bi bi-coin metric-icon"></i>
+                    <div class="stat-label">手續費 (USDC)</div>
+                    <div class="stat-value negative" id="total-fees">--</div>
+                    <div class="small-text">本次運行</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="bi bi-currency-exchange metric-icon"></i>
+                    <div class="stat-label">當前價格</div>
+                    <div class="stat-value neutral" id="current-price">--</div>
+                    <div class="small-text" id="symbol-display">--</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <i class="bi bi-clock metric-icon"></i>
+                    <div class="stat-label">運行時間</div>
+                    <div class="stat-value neutral" id="runtime">--</div>
+                    <div class="small-text">本次會話</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 圖表區域 -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-bar-chart"></i> 每日盈虧趨勢 (最近7天)
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="pnlChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-graph-up"></i> 每日成交量趨勢 (最近7天)
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="volumeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 交易記錄 -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-receipt"></i> 最近交易記錄 (最新100筆)
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>時間</th>
+                                        <th>方向</th>
+                                        <th>類型</th>
+                                        <th>數量</th>
+                                        <th>價格</th>
+                                        <th>成交額</th>
+                                        <th>手續費</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trades-table">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">
+                                            載入中...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 績效指標 -->
+        <div class="row mt-4 mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-award"></i> 整體績效指標
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>總交易筆數</strong></p>
+                                <p class="text-muted mb-0" id="perf-total-trades">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Maker交易</strong></p>
+                                <p class="text-muted mb-0" id="perf-maker-trades">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>平均成交價</strong></p>
+                                <p class="text-muted mb-0" id="perf-avg-price">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>平均成交量</strong></p>
+                                <p class="text-muted mb-0" id="perf-avg-size">--</p>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>總成交額</strong></p>
+                                <p class="text-muted mb-0" id="perf-total-volume">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>總手續費</strong></p>
+                                <p class="text-muted mb-0" id="perf-total-fees">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>淨利潤</strong></p>
+                                <p class="mb-0" id="perf-net-profit">--</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-1"><strong>Maker成交量</strong></p>
+                                <p class="text-muted mb-0" id="perf-maker-volume">--</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let pnlChart = null;
+        let volumeChart = null;
+        let autoRefreshInterval = null;
+
+        // 初始化圖表
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#c9d1d9' }
+                    }
+                },
+                scales: {
+                    y: {
+                        ticks: { color: '#8b949e' },
+                        grid: { color: '#21262d' }
+                    },
+                    x: {
+                        ticks: { color: '#8b949e' },
+                        grid: { color: '#21262d' }
+                    }
+                }
+            };
+
+            // 盈虧圖表
+            const pnlCtx = document.getElementById('pnlChart').getContext('2d');
+            pnlChart = new Chart(pnlCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '淨利潤 (USDC)',
+                        data: [],
+                        backgroundColor: '#238636',
+                        borderColor: '#2ea043',
+                        borderWidth: 1
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // 成交量圖表
+            const volumeCtx = document.getElementById('volumeChart').getContext('2d');
+            volumeChart = new Chart(volumeCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Maker成交量',
+                            data: [],
+                            borderColor: '#58a6ff',
+                            backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Taker成交量',
+                            data: [],
+                            borderColor: '#8957e5',
+                            backgroundColor: 'rgba(137, 87, 229, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: chartOptions
+            });
+        }
+
+        // 格式化數字
+        function formatNumber(num, decimals = 2) {
+            if (num === null || num === undefined || num === '--') return '--';
+            return parseFloat(num).toFixed(decimals);
+        }
+
+        // 格式化帶顏色的數字
+        function formatWithColor(value, decimals = 2) {
+            if (value === null || value === undefined) return '--';
+            const num = parseFloat(value);
+            const formatted = num.toFixed(decimals);
+            if (num > 0) return `<span class="positive">+${formatted}</span>`;
+            if (num < 0) return `<span class="negative">${formatted}</span>`;
+            return formatted;
+        }
+
+        // 載入當前狀態
+        async function loadCurrentStatus() {
+            try {
+                const response = await fetch('/api/dashboard/current');
+                const data = await response.json();
+
+                const stats = data.stats || {};
+                const status = data.bot_status || {};
+
+                // 更新狀態徽章
+                const statusBadge = document.getElementById('bot-status-badge');
+                if (status.running) {
+                    statusBadge.textContent = '運行中';
+                    statusBadge.className = 'status-badge status-running ms-2';
+                } else {
+                    statusBadge.textContent = '停止';
+                    statusBadge.className = 'status-badge status-stopped ms-2';
+                }
+
+                // 更新統計數據
+                document.getElementById('total-balance').textContent = formatNumber(stats.quote_balance || stats.total_balance_usd, 2);
+                document.getElementById('cumulative-pnl').innerHTML = formatWithColor(stats.cumulative_pnl, 2);
+                document.getElementById('total-volume').textContent = formatNumber(stats.total_volume_usdc, 2);
+                document.getElementById('total-trades').textContent = stats.total_trades || 0;
+                document.getElementById('buy-trades').textContent = stats.buy_trades || 0;
+                document.getElementById('sell-trades').textContent = stats.sell_trades || 0;
+                document.getElementById('slippage-rate').innerHTML = formatWithColor(stats.slippage_rate, 4) + '%';
+                document.getElementById('total-fees').textContent = formatNumber(stats.total_fees, 4);
+                document.getElementById('current-price').textContent = formatNumber(stats.current_price, 6);
+                document.getElementById('symbol-display').textContent = stats.symbol || '--';
+                document.getElementById('runtime').textContent = stats.runtime_formatted || '--';
+
+            } catch (error) {
+                console.error('載入當前狀態失敗:', error);
+            }
+        }
+
+        // 載入歷史統計
+        async function loadHistoryStats() {
+            try {
+                const response = await fetch('/api/dashboard/history?symbol=SOL_USDC_PERP&days=7');
+                const data = await response.json();
+
+                if (data.success && data.daily_stats) {
+                    const stats = data.daily_stats.reverse(); // 從舊到新排序
+
+                    // 更新盈虧圖表
+                    pnlChart.data.labels = stats.map(s => s.date);
+                    pnlChart.data.datasets[0].data = stats.map(s => s.net_profit);
+                    pnlChart.update();
+
+                    // 更新成交量圖表
+                    volumeChart.data.labels = stats.map(s => s.date);
+                    volumeChart.data.datasets[0].data = stats.map(s =>
+                        (s.maker_buy_volume || 0) + (s.maker_sell_volume || 0)
+                    );
+                    volumeChart.data.datasets[1].data = stats.map(s =>
+                        (s.taker_buy_volume || 0) + (s.taker_sell_volume || 0)
+                    );
+                    volumeChart.update();
+                }
+            } catch (error) {
+                console.error('載入歷史統計失敗:', error);
+            }
+        }
+
+        // 載入交易記錄
+        async function loadTrades() {
+            try {
+                const response = await fetch('/api/dashboard/trades?symbol=SOL_USDC_PERP&limit=100');
+                const data = await response.json();
+
+                if (data.success && data.trades) {
+                    const tbody = document.getElementById('trades-table');
+                    tbody.innerHTML = '';
+
+                    if (data.trades.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暫無交易記錄</td></tr>';
+                        return;
+                    }
+
+                    data.trades.forEach(trade => {
+                        const tr = document.createElement('tr');
+                        const volume = (parseFloat(trade.quantity) * parseFloat(trade.price)).toFixed(2);
+
+                        const sideBadge = trade.side === 'Bid' ?
+                            '<span class="badge badge-buy">買入</span>' :
+                            '<span class="badge badge-sell">賣出</span>';
+
+                        const typeBadge = trade.maker ?
+                            '<span class="badge badge-maker">Maker</span>' :
+                            '<span class="badge badge-taker">Taker</span>';
+
+                        tr.innerHTML = `
+                            <td>${new Date(trade.timestamp).toLocaleString('zh-CN')}</td>
+                            <td>${sideBadge}</td>
+                            <td>${typeBadge}</td>
+                            <td>${formatNumber(trade.quantity, 4)}</td>
+                            <td>${formatNumber(trade.price, 6)}</td>
+                            <td>${volume}</td>
+                            <td>${formatNumber(trade.fee, 6)}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (error) {
+                console.error('載入交易記錄失敗:', error);
+            }
+        }
+
+        // 載入績效指標
+        async function loadPerformance() {
+            try {
+                const response = await fetch('/api/dashboard/performance?symbol=SOL_USDC_PERP');
+                const data = await response.json();
+
+                if (data.success && data.performance) {
+                    const perf = data.performance;
+
+                    document.getElementById('perf-total-trades').textContent = perf.total_trades || 0;
+                    document.getElementById('perf-maker-trades').textContent =
+                        `${perf.maker_trades || 0} (${perf.total_trades > 0 ? ((perf.maker_trades / perf.total_trades) * 100).toFixed(1) : 0}%)`;
+                    document.getElementById('perf-avg-price').textContent = formatNumber(perf.avg_price, 6);
+                    document.getElementById('perf-avg-size').textContent = formatNumber(perf.avg_trade_size, 4);
+                    document.getElementById('perf-total-volume').textContent = formatNumber(perf.total_volume, 2) + ' USDC';
+                    document.getElementById('perf-total-fees').textContent = formatNumber(perf.total_fees, 4) + ' USDC';
+
+                    const netProfit = perf.total_net_profit || 0;
+                    document.getElementById('perf-net-profit').innerHTML =
+                        formatWithColor(netProfit, 4) + ' USDC';
+
+                    document.getElementById('perf-maker-volume').textContent = formatNumber(perf.maker_volume, 2) + ' USDC';
+                }
+            } catch (error) {
+                console.error('載入績效指標失敗:', error);
+            }
+        }
+
+        // 刷新所有數據
+        async function refreshAllData() {
+            console.log('刷新數據...');
+            await Promise.all([
+                loadCurrentStatus(),
+                loadHistoryStats(),
+                loadTrades(),
+                loadPerformance()
+            ]);
+        }
+
+        // 頁面載入時初始化
+        window.addEventListener('load', async () => {
+            initCharts();
+            await refreshAllData();
+
+            // 每5秒自動刷新當前狀態
+            autoRefreshInterval = setInterval(() => {
+                loadCurrentStatus();
+            }, 5000);
+        });
+
+        // 頁面卸載時清除定時器
+        window.addEventListener('beforeunload', () => {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>
