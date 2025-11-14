@@ -10,13 +10,13 @@ module.exports = {
         "--market-type", "perp",
         "--symbol", "SOL_USDC_PERP",
         "--strategy", "standard",
-        "--spread", "0.007",              // 0.7% 价差（平衡）
-        "--quantity", "0.08",             // 0.08 SOL 每单
+        "--spread", "0.007",              // 0.7% 价差
+        "--quantity", "0.1",              // 0.1 SOL 每单
         "--max-orders", "2",              // 2对订单
         "--target-position", "0",         // 目标中性持仓
         "--max-position", "1.5",          // 最大持仓 1.5 SOL
         "--position-threshold", "0.8",    // 持仓偏离 0.8 触发调整
-        "--inventory-skew", "0.6",        // 库存偏移 60%（重要！）
+        "--inventory-skew", "0.6",        // 库存偏移 60%（启用调整）
         "--stop-loss", "50",              // 止损 -50 USDC
         "--take-profit", "100",           // 止盈 +100 USDC
         "--duration", "86400",            // 运行 24 小时

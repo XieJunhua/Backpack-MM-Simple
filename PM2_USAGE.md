@@ -2,10 +2,9 @@
 
 ## 📋 概述
 
-本项目提供了两个 PM2 配置文件：
+本项目提供了 PM2 配置文件：
 
-1. **ecosystem.config.js** - 单一平衡配置（推荐新手）
-2. **ecosystem.multi.config.js** - 多策略配置（高级用户）
+**ecosystem.config.js** - 平衡配置（推荐使用）
 
 ---
 
@@ -40,7 +39,7 @@ echo $MASTER_PASSWORD
 
 ### 3. 修改配置文件路径
 
-编辑 `ecosystem.config.js` 或 `ecosystem.multi.config.js`：
+编辑 `ecosystem.config.js`：
 
 ```javascript
 cwd: "/root/github/Backpack-MM-Simple",  // 改为你的实际项目路径
@@ -48,14 +47,14 @@ cwd: "/root/github/Backpack-MM-Simple",  // 改为你的实际项目路径
 
 ---
 
-## 📁 使用单一配置（推荐）
+## 📁 启动和管理
 
 ### 启动策略
 
 ```bash
 cd /root/github/Backpack-MM-Simple
 
-# 启动平衡配置
+# 启动做市策略
 pm2 start ecosystem.config.js
 
 # 查看状态
@@ -93,58 +92,11 @@ pm2 startup  # 生成开机启动脚本
 
 ---
 
-## 🎯 使用多配置文件
-
-### 启动特定策略
-
-```bash
-cd /root/github/Backpack-MM-Simple
-
-# 只启动平衡配置（推荐）
-pm2 start ecosystem.multi.config.js --only sol_perp_balanced
-
-# 只启动保守配置
-pm2 start ecosystem.multi.config.js --only sol_perp_conservative
-
-# 只启动激进配置（高风险）
-pm2 start ecosystem.multi.config.js --only sol_perp_aggressive
-
-# 只启动 Web 仪表盘
-pm2 start ecosystem.multi.config.js --only web_dashboard
-
-# 启动全部
-pm2 start ecosystem.multi.config.js
-```
-
-### 同时运行多个策略
-
-```bash
-# 启动平衡策略 + Web 仪表盘
-pm2 start ecosystem.multi.config.js --only "sol_perp_balanced,web_dashboard"
-
-# 查看所有运行的进程
-pm2 status
-```
-
-输出示例：
-```
-┌─────┬──────────────────────┬─────────┬─────────┬──────────┐
-│ id  │ name                 │ status  │ cpu     │ memory   │
-├─────┼──────────────────────┼─────────┼─────────┼──────────┤
-│ 0   │ sol_perp_balanced    │ online  │ 0.5%    │ 45.2mb   │
-│ 1   │ web_dashboard        │ online  │ 0.1%    │ 32.1mb   │
-└─────┴──────────────────────┴─────────┴─────────┴──────────┘
-```
-
----
-
-## 📊 配置对比
+## 📊 配置说明
 
 | 配置 | 价差 | 单量 | 持仓限制 | 风险 | 适合人群 |
 |-----|------|------|---------|------|---------|
-| **平衡** | 0.7% | 0.08 SOL | 1.5 SOL | ⚠️ 中 | 大部分用户 |
-| **保守** | 0.5% | 0.05 SOL | 0.5 SOL | ✅ 低 | 新手/风险厌恶 |
-| **激进** | 1.0% | 0.15 SOL | 3.0 SOL | ❌ 高 | 有经验/追求高收益 |
+| **平衡** | 0.7% | 0.1 SOL | 1.5 SOL | ⚠️ 中 | 大部分用户 |
 
 ---
 
@@ -168,10 +120,10 @@ pm2 web
 pm2 logs
 
 # 指定进程日志
-pm2 logs sol_perp_balanced
+pm2 logs sol_perp_mm
 
 # 查看错误日志
-pm2 logs sol_perp_balanced --err
+pm2 logs sol_perp_mm --err
 
 # 清空日志
 pm2 flush
@@ -184,10 +136,10 @@ ls -lh logs/
 
 ```bash
 # 进程详情
-pm2 show sol_perp_balanced
+pm2 show sol_perp_mm
 
 # 内存使用
-pm2 describe sol_perp_balanced
+pm2 describe sol_perp_mm
 
 # 环境变量
 pm2 env 0  # 0 是进程 ID
@@ -242,7 +194,7 @@ pm2 set pm2-logrotate:rotateInterval '0 0 * * *'  # 每天轮转
 
 ```bash
 # 查看详细日志
-pm2 logs sol_perp_balanced --lines 200
+pm2 logs sol_perp_mm --lines 200
 
 # 常见原因:
 # 1. MASTER_PASSWORD 未设置
@@ -264,7 +216,7 @@ pip list | grep cryptography
 
 # 测试手动运行
 cd /root/github/Backpack-MM-Simple
-python3 run.py --exchange backpack --market-type perp --symbol SOL_USDC_PERP --spread 0.007 --quantity 0.08
+python3 run.py --exchange backpack --market-type perp --symbol SOL_USDC_PERP --spread 0.007 --quantity 0.1
 ```
 
 ---
@@ -276,7 +228,7 @@ python3 run.py --exchange backpack --market-type perp --symbol SOL_USDC_PERP --s
 pm2 status
 
 # 如果重启次数很多，检查:
-pm2 logs sol_perp_balanced --err --lines 100
+pm2 logs sol_perp_mm --err --lines 100
 ```
 
 **常见原因**:
@@ -377,7 +329,7 @@ git pull
 pm2 restart all
 
 # 或者只重启策略
-pm2 restart sol_perp_balanced
+pm2 restart sol_perp_mm
 ```
 
 ---
@@ -422,7 +374,7 @@ pm2 unstartup
 
 ```bash
 # 手动运行测试
-python3 run.py --exchange backpack --market-type perp --symbol SOL_USDC_PERP --spread 0.007 --quantity 0.08 --duration 600
+python3 run.py --exchange backpack --market-type perp --symbol SOL_USDC_PERP --spread 0.007 --quantity 0.1 --duration 600
 
 # 确认无误后用 PM2 启动
 pm2 start ecosystem.config.js
@@ -432,10 +384,10 @@ pm2 start ecosystem.config.js
 
 ```bash
 # 每天检查一次
-pm2 logs sol_perp_balanced --lines 100 --nostream
+pm2 logs sol_perp_mm --lines 100 --nostream
 
 # 查看错误
-pm2 logs sol_perp_balanced --err --lines 50
+pm2 logs sol_perp_mm --err --lines 50
 ```
 
 ### 3. 监控资源使用
@@ -445,7 +397,7 @@ pm2 logs sol_perp_balanced --err --lines 50
 pm2 monit
 
 # 检查内存
-pm2 describe sol_perp_balanced | grep memory
+pm2 describe sol_perp_mm | grep memory
 ```
 
 ### 4. 定期备份数据库
@@ -453,45 +405,6 @@ pm2 describe sol_perp_balanced | grep memory
 ```bash
 # 备份交易数据
 cp trading_data.db backup/trading_data_$(date +%Y%m%d).db
-```
-
-### 5. 使用多配置文件
-
-建议同时运行：
-```bash
-# 策略 + Web 仪表盘
-pm2 start ecosystem.multi.config.js --only "sol_perp_balanced,web_dashboard"
-
-# 访问仪表盘
-# http://your-server-ip:5000/dashboard
-```
-
----
-
-## 🎯 推荐配置组合
-
-### 新手推荐
-
-```bash
-# 保守策略 + Web 仪表盘
-pm2 start ecosystem.multi.config.js --only "sol_perp_conservative,web_dashboard"
-pm2 save
-```
-
-### 经验用户推荐
-
-```bash
-# 平衡策略 + Web 仪表盘
-pm2 start ecosystem.multi.config.js --only "sol_perp_balanced,web_dashboard"
-pm2 save
-```
-
-### 高级用户
-
-```bash
-# 激进策略 + Web 仪表盘（需要密切监控）
-pm2 start ecosystem.multi.config.js --only "sol_perp_aggressive,web_dashboard"
-pm2 save
 ```
 
 ---
