@@ -18,6 +18,21 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from logger import setup_logger
 
+# 导入安全模块
+try:
+    from security.auth import get_auth_instance, require_auth, rate_limit
+    SECURITY_ENABLED = True
+except ImportError:
+    logger.warning("安全模块未安装,认证功能将被禁用")
+    SECURITY_ENABLED = False
+    # 提供空装饰器
+    def require_auth(f):
+        return f
+    def rate_limit(*args, **kwargs):
+        def decorator(f):
+            return f
+        return decorator
+
 logger = setup_logger("web_server")
 
 app = Flask(__name__,
@@ -63,6 +78,59 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/api/login', methods=['POST'])
+@rate_limit(max_requests=5, window_seconds=60)
+def login():
+    """用户登录"""
+    if not SECURITY_ENABLED:
+        return jsonify({'success': False, 'message': '安全模块未启用'}), 501
+
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'success': False, 'message': '用户名和密码不能为空'}), 400
+
+    auth = get_auth_instance()
+
+    # 验证用户名密码
+    if not auth.verify_password(username, password):
+        logger.warning(f"登录失败: {username} from {request.remote_addr}")
+        return jsonify({'success': False, 'message': '用户名或密码错误'}), 401
+
+    # 生成token
+    token = auth.generate_token(username)
+    if not token:
+        return jsonify({'success': False, 'message': '生成token失败'}), 500
+
+    logger.info(f"用户登录成功: {username} from {request.remote_addr}")
+    return jsonify({
+        'success': True,
+        'token': token,
+        'message': '登录成功'
+    })
+
+
+@app.route('/api/logout', methods=['POST'])
+@require_auth
+def logout():
+    """用户登出"""
+    if not SECURITY_ENABLED:
+        return jsonify({'success': False, 'message': '安全模块未启用'}), 501
+
+    auth_header = request.headers.get('Authorization')
+    if auth_header:
+        try:
+            _, token = auth_header.split()
+            auth = get_auth_instance()
+            auth.revoke_token(token)
+        except:
+            pass
+
+    return jsonify({'success': True, 'message': '登出成功'})
+
+
 @app.route('/api/status', methods=['GET'])
 def get_status():
     """獲取機器人狀態"""
@@ -70,6 +138,8 @@ def get_status():
 
 
 @app.route('/api/start', methods=['POST'])
+@require_auth
+@rate_limit(max_requests=3, window_seconds=60)
 def start_bot():
     """啟動做市機器人"""
     global current_strategy, strategy_thread, bot_status, last_stats
@@ -383,6 +453,8 @@ def start_bot():
 
 
 @app.route('/api/stop', methods=['POST'])
+@require_auth
+@rate_limit(max_requests=5, window_seconds=60)
 def stop_bot():
     """停止做市機器人"""
     global current_strategy, bot_status, strategy_thread

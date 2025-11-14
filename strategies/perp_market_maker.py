@@ -15,6 +15,16 @@ from logger import setup_logger
 from strategies.market_maker import MarketMaker, format_balance
 from utils.helpers import round_to_precision, round_to_tick_size
 
+# 导入滑点保护模块
+try:
+    from utils.slippage_protection import SlippageProtection, validate_market_order_price
+    SLIPPAGE_PROTECTION_AVAILABLE = True
+except ImportError:
+    logger.warning("滑点保护模块未找到,将禁用滑点保护功能")
+    SLIPPAGE_PROTECTION_AVAILABLE = False
+    SlippageProtection = None
+    validate_market_order_price = None
+
 logger = setup_logger("perp_market_maker")
 
 
@@ -36,6 +46,8 @@ class PerpetualMarketMaker(MarketMaker):
         ws_proxy: Optional[str] = None,
         exchange: str = 'backpack',
         exchange_config: Optional[Dict[str, Any]] = None,
+        max_slippage_bps: int = 50,  # 最大滑点(基点)
+        enable_slippage_protection: bool = True,
         **kwargs,
     ) -> None:
         """
@@ -83,6 +95,17 @@ class PerpetualMarketMaker(MarketMaker):
         # 添加總成交量統計（以報價資產計價）
         self.total_volume_quote = 0.0
         self.session_total_volume_quote = 0.0
+
+        # 初始化滑点保护
+        self.slippage_protection = None
+        if SLIPPAGE_PROTECTION_AVAILABLE and enable_slippage_protection:
+            self.slippage_protection = SlippageProtection(
+                max_slippage_bps=max_slippage_bps,
+                enable_protection=True
+            )
+            logger.info(f"滑点保护已启用: 最大滑点 {max_slippage_bps}bp")
+        else:
+            logger.warning("滑点保护未启用")
 
         logger.info(
             "初始化永續合約做市: %s | 目標持倉量: %s | 最大持倉量: %s | 觸發閾值: %s",
@@ -431,11 +454,47 @@ class PerpetualMarketMaker(MarketMaker):
             if price is None:
                 raise ValueError("Limit 訂單需要提供價格")
             price_value = round_to_tick_size(price, self.tick_size)
+
+            # 滑点保护: 检查限价单价格
+            if self.slippage_protection:
+                current_price = self.get_current_price()
+                if current_price:
+                    order_side = 'buy' if side == 'Bid' else 'sell'
+                    passed, deviation_pct, msg = self.slippage_protection.check_price_deviation(
+                        reference_price=current_price,
+                        execution_price=price_value,
+                        side=order_side
+                    )
+                    if not passed:
+                        logger.error(f"滑点保护触发,拒绝订单: {msg}")
+                        return {"error": f"slippage_protection_failed: {msg}"}
+                    else:
+                        logger.debug(f"滑点检查通过: {msg}")
+
             order_details["price"] = str(price_value)
         else:
             # 使用當前深度推估價格方便記錄
             bid_price, ask_price = self.get_market_depth()
             reference_price = ask_price if side == "Bid" else bid_price
+
+            # 滑点保护: 市价单价格验证
+            if self.slippage_protection and SLIPPAGE_PROTECTION_AVAILABLE:
+                current_price = self.get_current_price()
+                if current_price and bid_price and ask_price and validate_market_order_price:
+                    order_side = 'buy' if side == 'Bid' else 'sell'
+                    passed, msg = validate_market_order_price(
+                        current_price=current_price,
+                        bid_price=bid_price,
+                        ask_price=ask_price,
+                        side=order_side,
+                        max_spread_bps=100  # 允许最大1%的价差
+                    )
+                    if not passed:
+                        logger.error(f"市价单滑点保护触发,拒绝订单: {msg}")
+                        return {"error": f"market_order_protection_failed: {msg}"}
+                    else:
+                        logger.debug(f"市价单验证通过: {msg}")
+
             if reference_price:
                 logger.debug(
                     "使用市場價格 %.8f 作為 %s 市價訂單參考",

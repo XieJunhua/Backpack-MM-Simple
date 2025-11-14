@@ -4,3 +4,10 @@ __pycache__/
 .env
 *.db
 .claude/settings.local.json
+
+# 安全相关文件
+.keystore
+.keystore.backup
+.keystore.gpg
+*.key
+*.pem
