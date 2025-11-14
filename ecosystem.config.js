@@ -27,7 +27,7 @@ module.exports = {
         "--position-threshold",
         "0.8", // 持仓偏离 0.8 触发调整
         "--inventory-skew",
-        "0.6", // 库存偏移 60%（启用调整）
+        "0", // 禁用库存偏移
         "--stop-loss",
         "10", // 止损 -10 USDC
         "--take-profit",
