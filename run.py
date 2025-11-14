@@ -13,6 +13,83 @@ from logger import setup_logger
 # 創建記錄器
 logger = setup_logger("main")
 
+# 尝试导入加密存储模块
+try:
+    from security.encryption import KeyEncryption
+    ENCRYPTION_AVAILABLE = True
+except ImportError:
+    ENCRYPTION_AVAILABLE = False
+    logger.warning("加密存储模块未找到，将仅使用环境变量")
+
+def load_credentials(exchange: str):
+    """
+    从加密存储或环境变量加载凭证
+
+    优先级:
+    1. 加密存储（如果可用且配置了MASTER_PASSWORD）
+    2. 环境变量
+
+    Args:
+        exchange: 交易所名称
+
+    Returns:
+        dict: 凭证字典，如果未找到则返回空字典
+    """
+    credentials = {}
+
+    # 尝试从加密存储读取
+    if ENCRYPTION_AVAILABLE and os.getenv('MASTER_PASSWORD'):
+        try:
+            encryptor = KeyEncryption()
+            creds = encryptor.load_credentials(exchange)
+            if creds:
+                logger.info(f"✅ 从加密存储加载 {exchange} 凭证")
+                return creds
+        except Exception as e:
+            logger.debug(f"从加密存储加载凭证失败: {e}")
+            logger.info(f"回退到环境变量加载 {exchange} 凭证")
+
+    # 回退到环境变量
+    if exchange == 'backpack':
+        api_key = os.getenv('BACKPACK_KEY', '')
+        secret_key = os.getenv('BACKPACK_SECRET', '')
+        if api_key or secret_key:
+            credentials = {
+                'api_key': api_key,
+                'secret_key': secret_key
+            }
+    elif exchange == 'aster':
+        api_key = os.getenv('ASTER_API_KEY', '')
+        secret_key = os.getenv('ASTER_SECRET_KEY', '')
+        if api_key or secret_key:
+            credentials = {
+                'api_key': api_key,
+                'secret_key': secret_key
+            }
+    elif exchange == 'paradex':
+        private_key = os.getenv('PARADEX_PRIVATE_KEY', '')
+        account_address = os.getenv('PARADEX_ACCOUNT_ADDRESS', '')
+        if private_key or account_address:
+            credentials = {
+                'private_key': private_key,
+                'account_address': account_address
+            }
+    elif exchange == 'lighter':
+        private_key = os.getenv('LIGHTER_PRIVATE_KEY') or os.getenv('LIGHTER_API_KEY', '')
+        account_index = os.getenv('LIGHTER_ACCOUNT_INDEX', '')
+        api_key_index = os.getenv('LIGHTER_API_KEY_INDEX', '')
+        if private_key:
+            credentials = {
+                'private_key': private_key,
+                'account_index': account_index,
+                'api_key_index': api_key_index
+            }
+
+    if credentials:
+        logger.info(f"✅ 从环境变量加载 {exchange} 凭证")
+
+    return credentials
+
 def parse_arguments():
     """解析命令行參數"""
     parser = argparse.ArgumentParser(description='Backpack Exchange 做市交易程序')
@@ -91,6 +168,10 @@ def main():
     validate_rebalance_args(args)
     
     exchange = args.exchange
+
+    # 从加密存储或环境变量加载凭证
+    credentials = load_credentials(exchange)
+
     api_key = ''
     secret_key = ''
     account_address: Optional[str] = None
@@ -98,8 +179,8 @@ def main():
     exchange_config = {}
 
     if exchange == 'backpack':
-        api_key = os.getenv('BACKPACK_KEY', '')
-        secret_key = os.getenv('BACKPACK_SECRET', '')
+        api_key = credentials.get('api_key', '')
+        secret_key = credentials.get('secret_key', '')
         ws_proxy = os.getenv('BACKPACK_PROXY_WEBSOCKET')
         base_url = os.getenv('BASE_URL', 'https://api.backpack.work')
         exchange_config = {
@@ -110,16 +191,16 @@ def main():
             'default_window': '5000'
         }
     elif exchange == 'aster':
-        api_key = os.getenv('ASTER_API_KEY', '')
-        secret_key = os.getenv('ASTER_SECRET_KEY', '')
+        api_key = credentials.get('api_key', '')
+        secret_key = credentials.get('secret_key', '')
         ws_proxy = os.getenv('ASTER_PROXY_WEBSOCKET')
         exchange_config = {
             'api_key': api_key,
             'secret_key': secret_key,
         }
     elif exchange == 'paradex':
-        private_key = os.getenv('PARADEX_PRIVATE_KEY', '')  # StarkNet 私鑰
-        account_address = os.getenv('PARADEX_ACCOUNT_ADDRESS')  # StarkNet 帳户地址
+        private_key = credentials.get('private_key', '')
+        account_address = credentials.get('account_address', '')
         ws_proxy = os.getenv('PARADEX_PROXY_WEBSOCKET')
         base_url = os.getenv('PARADEX_BASE_URL', 'https://api.prod.paradex.trade/v1')
 
@@ -132,16 +213,18 @@ def main():
             'base_url': base_url,
         }
     elif exchange == 'lighter':
-        api_key = os.getenv('LIGHTER_PRIVATE_KEY') or os.getenv('LIGHTER_API_KEY')
-        secret_key = os.getenv('LIGHTER_SECRET_KEY') or api_key
+        api_key = credentials.get('private_key', '')
+        secret_key = api_key
         ws_proxy = os.getenv('LIGHTER_PROXY_WEBSOCKET') or os.getenv('LIGHTER_WS_PROXY')
         base_url = os.getenv('LIGHTER_BASE_URL')
-        account_index = os.getenv('LIGHTER_ACCOUNT_INDEX')
+        account_index = credentials.get('account_index', '')
         account_address = os.getenv('LIGHTER_ADDRESS')
+
         if not account_index and account_address:
             from api.lighter_client import _get_lihgter_account_index
             account_index = _get_lihgter_account_index(account_address)
-        api_key_index = os.getenv('LIGHTER_API_KEY_INDEX')
+
+        api_key_index = credentials.get('api_key_index', '')
         chain_id = os.getenv('LIGHTER_CHAIN_ID')
 
         exchange_config = {
@@ -159,18 +242,31 @@ def main():
     # 檢查API密鑰
     if exchange == 'paradex':
         if not secret_key or not account_address:
-            logger.error("Paradex 需要提供 StarkNet 私鑰與帳户地址，請確認環境變數已設定")
+            logger.error("❌ Paradex 需要提供 StarkNet 私鑰與帳户地址")
+            logger.error("解決方案:")
+            logger.error("  1. 使用加密存储: 設置 MASTER_PASSWORD 環境變量並運行 python security/encryption.py migrate")
+            logger.error("  2. 使用环境变量: 設置 PARADEX_PRIVATE_KEY 和 PARADEX_ACCOUNT_ADDRESS")
             sys.exit(1)
     elif exchange == 'lighter':
         if not api_key:
-            logger.error("缺少 Lighter 私鑰，請使用 --api-key 或環境變量 LIGHTER_PRIVATE_KEY 提供")
+            logger.error("❌ 缺少 Lighter 私鑰")
+            logger.error("解決方案:")
+            logger.error("  1. 使用加密存储: 設置 MASTER_PASSWORD 環境變量並運行 python security/encryption.py migrate")
+            logger.error("  2. 使用环境变量: 設置 LIGHTER_PRIVATE_KEY")
             sys.exit(1)
         if not exchange_config.get('account_index'):
-            logger.error("缺少 Lighter Account Index，請透過環境變量 LIGHTER_ACCOUNT_INDEX 提供")
+            logger.error("❌ 缺少 Lighter Account Index")
+            logger.error("請透過環境變量 LIGHTER_ACCOUNT_INDEX 提供")
             sys.exit(1)
     else:
         if not api_key or not secret_key:
-            logger.error("缺少API密鑰，請通過命令行參數或環境變量提供")
+            logger.error(f"❌ 缺少 {exchange.upper()} API 密鑰")
+            logger.error("解決方案:")
+            logger.error("  1. 使用加密存储 (推薦):")
+            logger.error("     export MASTER_PASSWORD='your-password'")
+            logger.error("     python security/encryption.py migrate")
+            logger.error(f"  2. 使用环境变量: 設置 {exchange.upper()}_KEY 和 {exchange.upper()}_SECRET")
+            logger.error(f"  3. 查看配置指南: cat SECURITY_SETUP.md")
             sys.exit(1)
     
     # 決定執行模式
