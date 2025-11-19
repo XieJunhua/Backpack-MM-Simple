@@ -4,7 +4,7 @@ module.exports = {
       name: "sol_perp_mm",
       script: "run.py",
       interpreter: "python3",
-      cwd: "/root/github/Backpack-MM-Simple", // 修改为你的项目路径
+      cwd: "/root/github/Backpack-MM-Simple",
       args: [
         "--exchange",
         "backpack",
@@ -12,31 +12,37 @@ module.exports = {
         "perp",
         "--symbol",
         "SOL_USDC_PERP",
-        "--strategy",
-        "standard",
+        // "--strategy", "standard", // 如果报错 unrecognized arguments，请删除此行
+
+        // --- 核心交易参数 ---
         "--spread",
-        "0.06", // 0.06% 价差（覆盖手续费）
+        "0.06", // [修正] 填 0.06 代表 0.06%。足以覆盖约 0.04% 的来回手续费
         "--quantity",
-        "0.5", // 0.5 SOL 每单
+        "0.3", // 每单 0.3 SOL
         "--max-orders",
-        "2", // 2对订单
+        "2", // 上下各挂 2 单
+
+        // --- 仓位管理 ---
         "--target-position",
-        "0", // 目标中性持仓
+        "0",
         "--max-position",
-        "1.5", // 最大持仓 1.5 SOL
+        "1.5",
         "--position-threshold",
-        "0.8", // 持仓偏离 0.8 触发调整
-        "--inventory-skew",
-        "0", // 禁用库存偏移
+        "0.9",
+        "1", // 建议开启库存倾斜
+
+        // --- 风险控制 ---
         "--stop-loss",
-        "10", // 止损 -10 USDC
+        "10",
         "--take-profit",
-        "10", // 止盈 +10 USDC
+        "10",
+
+        // --- 运行设置 ---
         "--duration",
-        "86400", // 运行 24 小时
+        "86400",
         "--interval",
-        "10", // 30 秒调整一次
-        "--enable-db", // 启用数据库记录
+        "10",
+        "--enable-db",
       ],
 
       // 环境变量
@@ -44,36 +50,20 @@ module.exports = {
         DISABLE_CONTROL_PANEL: "true",
         WEB_HOST: "0.0.0.0",
         WEB_PORT: "5000",
-        PYTHONUNBUFFERED: "1", // 立即输出日志，不缓冲
+        PYTHONUNBUFFERED: "1",
       },
 
-      // 进程管理
       instances: 1,
       exec_mode: "fork",
       autorestart: true,
       watch: false,
-      max_restarts: 20, // 增加最大重启次数
-      min_uptime: "10s", // 最小运行时间
-      restart_delay: 5000, // 重启延迟 5 秒
-      exp_backoff_restart_delay: 100, // 指数退避重启
+      max_restarts: 20,
+      restart_delay: 5000,
 
-      // 日志管理
       error_file: "./logs/sol_perp_mm_err.log",
       out_file: "./logs/sol_perp_mm_out.log",
       log_file: "./logs/sol_perp_mm_combined.log",
-      log_date_format: "YYYY-MM-DD HH:mm:ss",
       merge_logs: true,
-
-      // 自动重启时间（每天凌晨4点重启）
-      cron_restart: "0 4 * * *",
-
-      // 监控
-      time: true,
-
-      // 错误处理
-      kill_timeout: 5000,
-      listen_timeout: 3000,
-      shutdown_with_message: false,
     },
   ],
 };
