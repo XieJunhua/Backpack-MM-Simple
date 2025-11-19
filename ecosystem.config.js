@@ -29,7 +29,8 @@ module.exports = {
         "1.5",
         "--position-threshold",
         "0.9",
-        "1", // 建议开启库存倾斜
+        "--inventory-skew",
+        "0", // 建议开启库存倾斜
 
         // --- 风险控制 ---
         "--stop-loss",
